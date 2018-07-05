@@ -82,14 +82,18 @@ app.post("/usuario/login", function (req, res, next) {
     var Query = Usuario.findOne();
     Query.where("email", req.body.email);
     Query.run({}, function (err, usuario) {
-        encryptPassword(req.body.password, function (cifrado) {
-            if (usuario.password == cifrado) {
-                var token = jwt.sign({ id: usuario.id, nombre: usuario.nombre, email: usuario.email, expActual: usuario.expActual, expSiguiente: usuario.expSiguiente }, 'shhhhh', { expiresIn: '7d' });
-                res.send({ "token": token });
-            } else {
-                res.send({ "msg": "email o contraseña incorrectos" });
-            }
-        });
+        if (usuario == undefined) {
+            res.json({ "msg": "email o contraseña incorrectos" });
+        } else {
+            encryptPassword(req.body.password, function (cifrado) {
+                if (usuario.password == cifrado) {
+                    var token = jwt.sign({ id: usuario.id, nombre: usuario.nombre, email: usuario.email, expActual: usuario.expActual, expSiguiente: usuario.expSiguiente }, 'shhhhh', { expiresIn: '7d' });
+                    res.send({ "token": token });
+                } else {
+                    res.send({ "msg": "email o contraseña incorrectos" });
+                }
+            });
+        }
     });
 });
 
@@ -562,7 +566,7 @@ app.get("/juego/bloque/tema/:idTema/pregunta/:tipo/niveles", function (req, res,
     });
 });
 app.get("/imagen/pregunta/:id", function (req, res, next) {
-    fs.readFile("./imagenes/preguntas/" + req.params.nombre, function (err, content) {
+    fs.readFile("./imagenes/preguntas/" + req.params.id, function (err, content) {
         if (err) {
             /*fs.readFile("./imagenes/noImagen.png", function (err, content) {
                 res.writeHead(200, { 'Content-type': 'image/jpg' });
@@ -831,8 +835,8 @@ function comprobarSiProblemas(idTema, callback) {
         }
     });
 }
-function comprobarSiTest(idTema,nivel, callback) {
-    Pregunta.all({ where: { Tema_id: idTema, tipo: "test",nivel: parseInt(nivel)+1 } }, function (err, preguntas) {
+function comprobarSiTest(idTema, nivel, callback) {
+    Pregunta.all({ where: { Tema_id: idTema, tipo: "test", nivel: parseInt(nivel) + 1 } }, function (err, preguntas) {
         if (preguntas.length > 0) {
             console.log("Tengo tests");
             callback(true);
@@ -886,7 +890,7 @@ app.post("/pregunta/correccion", function (req, res, next) {
             }
         } else {
             if (req.body.respuesta === pregunta.solucion) {
-                comprobarSiTest(pregunta.Tema_id,nivel, function (hay) {
+                comprobarSiTest(pregunta.Tema_id, nivel, function (hay) {
                     if (hay) {
                         Progreso_Partida.update({ where: { id_partida: idPartida, id_jugador: idUsuario } },
                             { nivel: parseInt(nivel) + 1, tipo: "test", tema: pregunta.Tema_id, id_pregunta_anterior: pregunta.id }, function (err, imagen) { });
