@@ -320,6 +320,7 @@ app.get("/imagen/juego/:nombre", function (req, res, next) {
 });
 
 app.post("/juego/bloque", function (req, res, next) {
+    console.log(" ---- " + req.body.nombre);
     var b = new Bloque({ nombre: req.body.nombre, Juego_id: req.body.idJuego });
     b.isValid(function (valid) {
         if (!valid) {
@@ -375,10 +376,12 @@ app.get("/juego/:idJuego/bloque", function (req, res, next) {
     Query.run({}, function (err, bloques) {
         var bloquesObjeto = {};
         bloquesObjeto.bloques = bloques;
+        console.log(bloquesObjeto.bloques);
         res.json(bloquesObjeto);
     });
 });
 app.post("/juego/bloque/tema", function (req, res, next) {
+    console.log(req.body.idBloque + " ---- " + req.body.nombre);
     var t = new Tema({ nombre: req.body.nombre, Bloque_id: req.body.idBloque });
     t.isValid(function (valid) {
         if (!valid) {
@@ -550,6 +553,7 @@ app.get("/juego/bloque/tema/:idTema/pregunta", function (req, res, next) {
     });
 });
 app.get("/juego/bloque/tema/:idTema/pregunta/:tipo/niveles", function (req, res, next) {
+    console.log(">>>" + req.params.idTema);
     Pregunta.all({ where: { Tema_id: req.params.idTema, tipo: req.params.tipo }, order: "nivel asc" }, function (err, count) {
         var nivel = 1;
         var niveles = 0;
@@ -562,6 +566,7 @@ app.get("/juego/bloque/tema/:idTema/pregunta/:tipo/niveles", function (req, res,
                 niveles++;
             }
         }
+        console.log(">>>" + niveles);
         res.json({ "niveles": niveles });
     });
 });
@@ -736,21 +741,23 @@ app.post("/partida/usuario", function (req, res, next) {
                     } else {
                         console.log("Usuario añadido con exito!!");
                         getPrimerTemaDeJuego(up.id_partida, function (idTema) {
-                            var progreso = new Progreso_Partida({ id_jugador: up.id_usuario, id_partida: up.id_partida, nivel: 1, tipo: "test", id_tema: idTema, id_pregunta_anterior: 0, terminado: 0 });
-                            progreso.isValid(function (valid) {
-                                if (!valid) {
-                                    console.log(progreso.errors); // hash of errors {attr: [errmessage, errmessage, ...], attr: ...}
-                                } else {
-                                    progreso.save(function (err) {
-                                        if (err) {
-                                            console.log("Error!!!");
-                                        } else {
-                                            console.log("Ok");
-                                        }
-                                    });
-                                }
+                            getTipoDePregunta(idTema, function (tipo) {
+                                var progreso = new Progreso_Partida({ id_jugador: up.id_usuario, id_partida: up.id_partida, nivel: 1, tipo: tipo, id_tema: idTema, id_pregunta_anterior: 0, terminado: 0 });
+                                progreso.isValid(function (valid) {
+                                    if (!valid) {
+                                        console.log(progreso.errors); // hash of errors {attr: [errmessage, errmessage, ...], attr: ...}
+                                    } else {
+                                        progreso.save(function (err) {
+                                            if (err) {
+                                                console.log("Error!!!");
+                                            } else {
+                                                console.log("Ok");
+                                            }
+                                        });
+                                    }
+                                });
+                                res.send({ "id_usuario": up.id_usuario, "id_partida": up.id_partida });
                             });
-                            res.send({ "id_usuario": up.id_usuario, "id_partida": up.id_partida });
                         });
                     }
                 });
@@ -758,7 +765,11 @@ app.post("/partida/usuario", function (req, res, next) {
         });
     });
 });
-
+function getTipoDePregunta(idTema, callback) {
+    Pregunta.all({ where: { "Tema_id": idTema, "nivel": 1 } }, function (err, preguntas) {
+        callback(preguntas[0].tipo)
+    });
+}
 function getPrimerTemaDeJuego(idPartida, callback) {
     var Query = Partida.all();
     Query.where("id", idPartida);
@@ -871,9 +882,11 @@ app.post("/pregunta/correccion", function (req, res, next) {
                                     } else {
                                         getPrimerTemaDeBloque(id, function (id) {
                                             console.log("Deberia cambiar de tema");
-                                            Progreso_Partida.update({ where: { id_partida: idPartida, id_jugador: idUsuario } },
-                                                { nivel: 1, tipo: "test", id_tema: id, id_pregunta_anterior: 0 }, function (err, imagen) { });
-                                            res.json("Respuesta correcta");
+                                            getTipoDePregunta(id, function (tipo) {
+                                                Progreso_Partida.update({ where: { id_partida: idPartida, id_jugador: idUsuario } },
+                                                    { nivel: 1, tipo: tipo, id_tema: id, id_pregunta_anterior: 0 }, function (err, imagen) { });
+                                                res.json("Respuesta correcta");
+                                            });
                                         });
                                     }
                                 });
@@ -1102,6 +1115,7 @@ function obtenerPreguntasDeJugador(idPartida, callback) {
 app.get("/partida/:idPartida/posicion/:tipoTablero/", function (req, res) {
     if (req.params.tipoTablero == "bloque") {
         obtenerBloquesDeJugador(req.params.idPartida, function (bloques) {
+            console.log(bloques);
             res.json(bloques);
         });
     } else if (req.params.tipoTablero == "tema") {
